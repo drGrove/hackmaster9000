@@ -1,0 +1,86 @@
+ARG KALI_LINUX_SHA=sha256:196554d5bd127e7ddee846ee2b1c81390f225d09453400c2b40e8ca646e1400d
+ARG BUNDLER_VERSION=2.0.1
+
+FROM kalilinux/kali-linux-docker@${KALI_LINUX_SHA}
+
+RUN \
+  apt-get update \
+  && apt-get install \
+    build-essential \
+    imagemagick \
+    libgmp-dev \
+    liblzma-dev \
+    libpq-dev \
+    libsqlite3-dev \
+    metasploit-framework \
+    nodejs \
+    openjdk-8-jdk \
+    patch \
+    phantomjs \
+    ruby \
+    ruby-dev \
+    sslscan \
+    zlib1g-dev \
+    zmap
+
+# Wordlists
+WORKDIR /usr/share/wordlist
+RUN \
+  git clone https://github.com/fuzzdb-project/fuzzdb.git \
+  curl https://raw.githubusercontent.com/assetnote/commonspeak2-wordlists/master/subdomains/subdomains.txt -o commonspeak2-free.txt \
+  curl https://raw.githubusercontent.com/danielmiessler/SecLists/master/Discovery/DNS/shubs-stackoverflow.txt -o shubs-stackoverflow.txt \
+  curl https://raw.githubusercontent.com/danielmiessler/SecLists/master/Discovery/DNS/dns-Jhaddix.txt -o jhaddix-subdomains.txt \
+  curl https://raw.githubusercontent.com/danielmiessler/SecLists/master/Passwords/Common-Credentials/best15.txt -o best15.txt \
+  # unzip rockyou, it's nice to have around
+  gzip -d rockyo.txt.gz \
+  mkdir /usr/share/wordlists/subdomains \
+  # copy some of the dnscan subdomains to the kali wordlist folder - they're nice too!
+  cp /usr/share/dirsearch/db/dicc.txt /usr/share/wordlists/dirsearch-default.txt \
+  cp /usr/share/dnscan/subdomains-*.txt /usr/share/wordlists/subdomains/
+
+WORKDIR /usr/share
+
+# DNSCAN
+RUN \
+  git clone https://github.com/rbsec/dnscan.git \
+  && cd dnscan \
+  && pip install -r requirements.txt \
+  && sudo ln -s /usr/share/dnscan/dnscan.py /usr/bin/dnscan
+
+# DIRSEARCH
+RUN \
+  git clone https://github.com/maurosoria/dirsearch.git \
+  && sudo ln -s /usr/share/dirsearch/dirsearch.py /usr/bin/dirsearch
+
+# GITGOT
+RUN \
+  git clone https://github.com/BishopFox/GitGot.git \
+  sudo ln -s /usr/share/GitGot/gitgot.py /usr/bin/gitgot
+
+# Screenshot Utility
+RUN npm install -g puppeteer why-is-node-running generic-pool
+COPY screenshot2.js /usr/bin/screenshot2
+
+# Other Custom Tools
+COPY custom_tools/check_vnc.rb /usr/bin/check_vnc
+COPY custom_tools/hostmash.rb /usr/bin/hostmash
+COPY custom_tools/metaldetector.rb /usr/bin/metaldetector
+COPY custom_tools/pwnVNC.py /usr/bin/pwnVNC
+COPY custom_tools/runsub.py /usr/bin/rnnsub
+COPY custom_tools/topminecraftservers.rb /usr/bin/topminecraftservers
+COPY custom_tools/web-screenshot.rb /usr/bin/web-screenshot
+COPY custom_tools/xtreme-scraper.rb /usr/bin/xtreme-scraper
+COPY custom_tools/zdns /usr/bin/zdns
+
+# Setup Hackmaster 9000 Terminal Server
+RUN \
+  gem install bundler:${BUNDLER_VERSION}
+
+COPY db.rb /usr/share/hackmaster9000/
+COPY config.rb /usr/share/hackmaster9000/
+COPY terminal-server.rb /usr/share/hackmaster9000/
+COPY Gemfile /usr/share/hackmaster9000/
+COPY Gemfile.lock /usr/share/hackmaster9000/
+
+RUN cd /usr/share/hackmaster9000/ && bundle install
+
